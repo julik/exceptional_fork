@@ -1,6 +1,20 @@
 = exceptional_fork
 
-Description goes here.
+Fork with a block and wait until the forked child exits.
+Any exceptions raised within the block will be re-raised from this
+in the parent process (where you call it from).
+
+    ExceptionalFork.fork_and_wait { raise "Explosion! "} # raises a RuntimeError
+
+or for something that runs longer:
+
+    ExceptionalFork.fork_and_wait do
+      perform_long_running_job! # this raises some EOFError or another
+    end
+    #=> EOFError... # more data and the backtrace.
+
+It is not guaranteed that all the exception metadata will be reinstated due to
+marshaling/unmarshaling mechanics, but it helps debugging nevertheless.
 
 == Contributing to exceptional_fork
  
