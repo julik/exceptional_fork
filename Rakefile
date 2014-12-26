@@ -11,14 +11,16 @@ rescue Bundler::BundlerError => e
 end
 require 'rake'
 
+require File.dirname(__FILE__) + '/lib/exceptional_fork'
 require 'jeweler'
 Jeweler::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://guides.rubygems.org/specification-reference/ for more options
+  gem.version = ExceptionalFork::VERSION
   gem.name = "exceptional_fork"
   gem.homepage = "http://github.com/julik/exceptional_fork"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.summary = %Q{ Raise exceptions from the forked child process in the parent }
+  gem.description = %Q{ Uses pipes to re-raise exceptions. Something better than an exit code has to exist. }
   gem.email = "me@julik.nl"
   gem.authors = ["Julik Tarkhanov"]
   # dependencies defined in Gemfile

@@ -1,7 +1,19 @@
 require File.expand_path(File.dirname(__FILE__) + '/spec_helper')
 
 describe "ExceptionalFork" do
-  it "fails" do
-    fail "hey buddy, you should probably rename this file and start specing for real"
+  it "re-raises the exception from a subprocess" do
+    expect(Process).to receive(:fork).and_call_original
+    
+    pid_of_parent = Process.pid
+    begin
+      ExceptionalFork.fork_and_wait do
+        raise "This is process #{Process.pid} calling"
+      end
+      expect(false).to eq(true), "This should never be reached"
+    rescue RuntimeError => e
+      matches = (e.message =~ /This is process (\d+) calling/)
+      expect(matches).not_to be_nil
+      expect($1).not_to eq(pid_of_parent.to_s)
+    end
   end
 end
