@@ -16,4 +16,19 @@ describe "ExceptionalFork" do
       expect($1).not_to eq(pid_of_parent.to_s)
     end
   end
+  
+  it "raises a ProcessHung if no exception information can be recovered" do
+    expect(Process).to receive(:fork).and_call_original
+    
+    pid_of_parent = Process.pid
+    begin
+      Thread.new { sleep 5; `killall -9 ef-test-process` }
+      ExceptionalFork.fork_and_wait { $0 = 'ef-test-process'; sleep 100; }
+      expect(false).to eq(true), "This should never be reached"
+    rescue => e
+      matches = (e.message =~ /No error information could be retrieved/)
+      expect(matches).not_to be_nil
+      expect($1).not_to eq(pid_of_parent.to_s)
+    end
+  end
 end

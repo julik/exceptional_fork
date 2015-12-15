@@ -1,5 +1,7 @@
 module ExceptionalFork
-  VERSION = '1.0.0'
+  VERSION = '1.1.0'
+  QUIT = "The child process %d has quit or was killed abruptly. No error information could be retrieved".freeze
+  ProcessHung = Class.new(StandardError)
   
   # Fork with a block and wait until the forked child exits.
   # Any exceptions raised within the block will be re-raised from this
@@ -32,6 +34,10 @@ module ExceptionalFork
     reader.close rescue IOError # Do not leak pipes since the process might be long-lived
   
     if $?.exitstatus != 0 # If the process exited uncleanly capture the error
+      # If the child gets kill -9d then no exception gets written, and no information
+      # gets recovered.
+      raise ProcessHung.new(QUIT % pid) if (child_error.nil? || child_error.empty?)
+      
       unmarshaled_error, backtrace_in_child = Marshal.load(child_error)
       # Pick up the exception 
       reconstructed_error = unmarshaled_error.exception
