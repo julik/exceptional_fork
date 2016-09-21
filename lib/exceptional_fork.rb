@@ -2,7 +2,7 @@ module ExceptionalFork
   VERSION = '1.1.0'
   QUIT = "The child process %d has quit or was killed abruptly. No error information could be retrieved".freeze
   ProcessHung = Class.new(StandardError)
-  
+  DEFAULT_TIMEOUT = 10
   # Fork with a block and wait until the forked child exits.
   # Any exceptions raised within the block will be re-raised from this
   # in the parent process (where you call it from).
@@ -18,7 +18,7 @@ module ExceptionalFork
   #
   # It is not guaranteed that all the exception metadata will be reinstated due to
   # marshaling/unmarshaling mechanics, but it helps debugging nevertheless.
-  def fork_and_wait
+  def fork_and_wait(kill_after_timeout = DEFAULT_TIMEOUT)
     # Redirect the exceptions in the child to the pipe. When we get a non-zero
     # exit code we can read from that pipe to obtain the exception.
     reader, writer = IO.pipe
@@ -26,16 +26,16 @@ module ExceptionalFork
     # Run the block in a forked child
     pid = fork_with_error_output(writer) { yield }
   
-    # Wait for the forked process to exit
-    Process.wait(pid)
+    # Wait for the forked process to exit, in a non-blocking fashion
+    exit_code = wait_and_capture(pid, kill_after_timeout)
   
     writer.close rescue IOError # Close the writer so that we can read from the reader
     child_error = reader.read # Read the error output
     reader.close rescue IOError # Do not leak pipes since the process might be long-lived
   
-    if $?.exitstatus != 0 # If the process exited uncleanly capture the error
-      # If the child gets kill -9d then no exception gets written, and no information
-      # gets recovered.
+    if exit_code.nonzero? # If the process exited uncleanly capture the error
+      # If the child gets KILLed then no exception gets written,
+      # and no information gets recovered.
       raise ProcessHung.new(QUIT % pid) if (child_error.nil? || child_error.empty?)
       
       unmarshaled_error, backtrace_in_child = Marshal.load(child_error)
@@ -66,12 +66,49 @@ module ExceptionalFork
         errors_pipe.puts(Marshal.dump(error_payload))
         errors_pipe.flush
       ensure
+        errors_pipe.close rescue nil
         Process.exit! success # Exit maintaining the status code
       end
     end
   
     # Return the PID of the forked child
     pid
+  end
+  
+  # Wait for a process to quit in a non-blocking fashion, using a
+  # preset timeout, and collect (or synthesize) it's exit code value afterwards
+  def wait_and_capture(pid, timeout)
+    started_waiting_at = Time.now
+    status = nil
+    signals = [:TERM, :KILL]
+    loop do
+      # Use wait2 to recover the status without the global variable (we might
+      # be threaded), use WNOHANG so that we do not have to block while waiting
+      # for the process to complete. If we block (without WNOHANG), MRI will still
+      # be able to do other work _but_ we might be waiting indefinitely. If we use
+      # a non-blocking option we can supply a timeout and force-quit the process
+      # without using the Timeout module (and conversely having an overhead of 1
+      # watcher thread per child spawned) 
+      if wait_res = Process.wait2(pid, Process::WNOHANG)
+        _, status = wait_res
+        return status.exitstatus
+      else
+        # If the process is still busy and didn't quit,
+        # we have to undertake Measures. Send progressively
+        # harsher signals to the child
+        Process.kill(signals.shift, pid) if (Time.now - started_waiting_at) > timeout
+        if signals.empty? # If we exhausted our force-quit powers, do a blocking wait since KILL _will_ work.
+          _, status = Process.wait2(pid)
+          return status.exitstatus || 99 # For killed processes this will be nil
+        end
+      end
+      Thread.pass
+    end
+  rescue Errno::ECHILD, Errno::ESRCH, Errno::EPERM => e# The child already quit
+    # Assume the process finished correctly. If there was an error, we will discover
+    # that from a zero-size output file. There may of course be a thing where the
+    # file gets written incompletely and the child crashes but hey - computers!
+    return 0
   end
   
   extend self
