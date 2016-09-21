@@ -27,7 +27,7 @@ describe "ExceptionalFork" do
   it "kills a process that takes too long to terminate" do
     expect(Process).to receive(:fork).and_call_original
     expect {
-      ExceptionalFork.fork_and_wait(1) { sleep 5; raise "Should never ever get here" }
+      ExceptionalFork.fork_and_wait(1) { sleep 20; raise "Should never ever get here" }
     }.to raise_error(ExceptionalFork::ProcessHung)
   end
   

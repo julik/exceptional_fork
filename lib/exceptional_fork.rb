@@ -97,8 +97,8 @@ module ExceptionalFork
       # be able to do other work _but_ we might be waiting indefinitely. If we use
       # a non-blocking option we can supply a timeout and force-quit the process
       # without using the Timeout module (and conversely having an overhead of 1
-      # watcher thread per child spawned) 
-      if wait_res = Process.wait2(pid, Process::WNOHANG)
+      # watcher thread per child spawned).
+      if wait_res = Process.wait2(pid, Process::WNOHANG | Process::WUNTRACED)
         _, status = wait_res
         return status.exitstatus || DEFAULT_ERROR_STATUS
       else
