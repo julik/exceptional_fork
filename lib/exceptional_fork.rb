@@ -3,6 +3,8 @@ module ExceptionalFork
   QUIT = "The child process %d has quit or was killed abruptly. No error information could be retrieved".freeze
   ProcessHung = Class.new(StandardError)
   DEFAULT_TIMEOUT = 10
+  DEFAULT_ERROR_STATUS = 99
+  
   # Fork with a block and wait until the forked child exits.
   # Any exceptions raised within the block will be re-raised from this
   # in the parent process (where you call it from).
@@ -91,15 +93,15 @@ module ExceptionalFork
       # watcher thread per child spawned) 
       if wait_res = Process.wait2(pid, Process::WNOHANG)
         _, status = wait_res
-        return status.exitstatus
+        return status.exitstatus || DEFAULT_ERROR_STATUS
       else
         # If the process is still busy and didn't quit,
         # we have to undertake Measures. Send progressively
         # harsher signals to the child
         Process.kill(signals.shift, pid) if (Time.now - started_waiting_at) > timeout
-        if signals.empty? # If we exhausted our force-quit powers, do a blocking wait since KILL _will_ work.
+        if signals.empty? # If we exhausted our force-quit powers, do a blocking wait. KILL _will_ work.
           _, status = Process.wait2(pid)
-          return status.exitstatus || 99 # For killed processes this will be nil
+          return status.exitstatus || DEFAULT_ERROR_STATUS # For killed processes this will be nil
         end
       end
       Thread.pass

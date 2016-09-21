@@ -17,6 +17,14 @@ describe "ExceptionalFork" do
     end
   end
   
+  it "kills a process that takes too long to terminate" do
+    expect(Process).to receive(:fork).and_call_original
+    pid_of_parent = Process.pid
+    expect {
+      ExceptionalFork.fork_and_wait(1) { sleep 5; raise "Should never ever get here" }
+    }.to raise_error(ExceptionalFork::ProcessHung)
+  end
+  
   it "raises a ProcessHung if no exception information can be recovered" do
     expect(Process).to receive(:fork).and_call_original
     
