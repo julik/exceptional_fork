@@ -1,5 +1,5 @@
 module ExceptionalFork
-  VERSION = '1.1.0'
+  VERSION = '1.2.0'
   QUIT = "The child process %d has quit or was killed abruptly. No error information could be retrieved".freeze
   ProcessHung = Class.new(StandardError)
   DEFAULT_TIMEOUT = 10
