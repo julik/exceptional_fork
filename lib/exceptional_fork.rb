@@ -20,6 +20,13 @@ module ExceptionalFork
   #
   # It is not guaranteed that all the exception metadata will be reinstated due to
   # marshaling/unmarshaling mechanics, but it helps debugging nevertheless.
+  #
+  # By default, the child process will be expected to complete within DEFAULT_TIMEOUT seconds
+  # (scientifically chosen by an Arbitraryometer-Of-Random-Assumptions). If you need to adjust
+  # the timeout, pass a different number as the timeout argument. The timeout is going to be
+  # excercised using wait2() with the WNOHANG option, so no threads are going to be used and
+  # the wait is not going to be blocking. ExceptionFork is going to do a `Thread.pass` to let
+  # other threads do work while it waits on the process to complete.
   def fork_and_wait(kill_after_timeout = DEFAULT_TIMEOUT)
     # Redirect the exceptions in the child to the pipe. When we get a non-zero
     # exit code we can read from that pipe to obtain the exception.
